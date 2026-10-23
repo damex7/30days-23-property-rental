@@ -27,6 +27,12 @@ function findFile(base) {
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    // next/headers, next/server, next/cache...: Next.js's own subpath files
+    // have no "exports" map, so Node's ESM resolver wants the ".js". (They're
+    // only imported here, never called: the scripts don't render pages.)
+    if (/^next\/[a-z-]+$/.test(specifier)) {
+      return nextResolve(`${specifier}.js`, context)
+    }
     let base = null
     if (specifier.startsWith('@/')) {
       base = join(root, specifier.slice(2))

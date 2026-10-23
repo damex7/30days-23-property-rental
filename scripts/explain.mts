@@ -61,6 +61,16 @@ const CASES: { title: string; query: SearchQuery }[] = [
   { title: '4. Page 2 of "price low to high" (keyset cursor, no window count)', query: { ...base, sort: 'price_asc', after: ['5000000', '00000000-0000-0000-0000-000000000000'] } },
 ]
 
+// THE "WHERE" INDEXES, one at a time. With ~20 rows the planner prefers to
+// walk the ORDER BY index and filter the OR of the three "where" tests (case
+// 1), which is right at this size. These probes show that each test CAN be
+// answered by its GIN index once a table is big enough to need it.
+const PROBES: { title: string; sql: string; values: unknown[] }[] = [
+  { title: '5a. Full-text: search @@ "lekki" (GIN on the tsvector)', sql: `SELECT id FROM listings WHERE search @@ websearch_to_tsquery('simple', $1)`, values: ['lekki'] },
+  { title: '5b. Fuzzy: "leki" <% area (GIN trigram on area)', sql: `SELECT id, area FROM listings WHERE $1 <% area`, values: ['leki'] },
+  { title: '5c. Fuzzy: "abuj" <% city (GIN trigram on city)', sql: `SELECT id, city FROM listings WHERE $1 <% city`, values: ['abuj'] },
+]
+
 const pool = new Pool({ connectionString })
 const client = await pool.connect()
 try {
@@ -76,6 +86,18 @@ try {
       } finally {
         await client.query('ROLLBACK')
       }
+    }
+  }
+  for (const probe of PROBES) {
+    await client.query('BEGIN')
+    try {
+      await client.query('SET LOCAL enable_seqscan = off')
+      const result = await client.query<{ 'QUERY PLAN': string }>(`EXPLAIN (ANALYZE, BUFFERS, COSTS OFF, SUMMARY ON) ${probe.sql}`, probe.values)
+      console.log(`
+=== ${probe.title}  [enable_seqscan = off] ===`)
+      for (const row of result.rows) console.log(row['QUERY PLAN'])
+    } finally {
+      await client.query('ROLLBACK')
     }
   }
 } finally {
