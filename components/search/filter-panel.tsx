@@ -22,7 +22,7 @@ export function FilterPanel({ children, activeCount }: { children: ReactNode; ac
   useEffect(() => {
     if (!open) return
     const node = panel.current
-    const button = opener.current
+    const openerNode = opener.current
     node?.querySelector<HTMLElement>('h2')?.focus()
     document.body.style.overflow = 'hidden'
     function onKey(event: KeyboardEvent) {
@@ -47,7 +47,7 @@ export function FilterPanel({ children, activeCount }: { children: ReactNode; ac
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
-      button?.focus()
+      openerNode?.focus()
     }
   }, [open])
 

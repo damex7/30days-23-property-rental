@@ -362,3 +362,39 @@ export async function refreshRating(db: Db, listingId: string | null): Promise<n
     RETURNING l.id`)
   return result.length
 }
+
+export const BookableListing = z.object({
+  id: z.uuid(),
+  hostId: z.uuid(),
+  slug: z.string(),
+  title: z.string(),
+  nightlyKobo: int8,
+  weekendKobo: int8.nullable(),
+  cleaningFeeKobo: int8,
+  cautionDepositKobo: int8,
+  weeklyDiscountPercent: z.number().int(),
+  minNights: z.number().int(),
+  maxNights: z.number().int(),
+  maxGuests: z.number().int(),
+  cancellationPolicy: z.enum(CANCELLATION_POLICIES),
+})
+export type BookableListing = z.infer<typeof BookableListing>
+
+/**
+ * A PUBLISHED listing's booking terms. With `lock`, FOR SHARE: inside
+ * Reserve, the host can't change the price or pause the listing between
+ * our reading the price and inserting the hold (their UPDATE waits for us).
+ */
+export async function getBookable(db: Db, listingId: string, { lock = false } = {}): Promise<BookableListing | null> {
+  return one(
+    db,
+    BookableListing,
+    q`SELECT l.id, l.host_id AS "hostId", l.slug, l.title, l.nightly_kobo AS "nightlyKobo", l.weekend_kobo AS "weekendKobo",
+             l.cleaning_fee_kobo AS "cleaningFeeKobo", l.caution_deposit_kobo AS "cautionDepositKobo",
+             l.weekly_discount_percent AS "weeklyDiscountPercent", l.min_nights AS "minNights", l.max_nights AS "maxNights",
+             l.max_guests AS "maxGuests", l.cancellation_policy AS "cancellationPolicy"
+      FROM listings l WHERE l.id = ${listingId} AND l.status = 'published'
+      ${lock ? q`FOR SHARE` : empty}`,
+    'getBookable',
+  )
+}

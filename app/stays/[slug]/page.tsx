@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
+import { BookingPanel } from '@/components/booking/booking-panel'
 import { AmenityList } from '@/components/stays/amenity-list'
 import { Gallery } from '@/components/stays/gallery'
 import { isGuestFavourite, Rating } from '@/components/stays/rating'
@@ -11,10 +13,12 @@ import { formatPrice } from '@/lib/money'
 import { POLICY_LABELS, PROPERTY_TYPE_LABELS } from '@/lib/options'
 import { firstValues } from '@/lib/schemas'
 import { isServiceError } from '@/lib/services/errors'
+import { getAvailability } from '@/lib/services/bookings'
 import { getPublicListing, listAmenities } from '@/lib/services/listings'
 import { listingReviews } from '@/lib/services/reviews'
 import { getPageActor } from '@/lib/services/session-actor'
 import { formatClock } from '@/lib/format'
+import { isValidDate } from '@/lib/time'
 
 export async function generateMetadata({ params }: PageProps<'/stays/[slug]'>): Promise<Metadata> {
   const { slug } = await params
@@ -45,11 +49,11 @@ async function Listing({ params, searchParams }: PageProps<'/stays/[slug]'>) {
     if (isServiceError(error) && error.kind === 'not_found') notFound()
     throw error
   }
-  const [actor, amenities, reviews] = await Promise.all([getPageActor(), listAmenities(null), listingReviews(null, listing.id)])
+  const [actor, amenities, reviews, availability] = await Promise.all([getPageActor(), listAmenities(null), listingReviews(null, listing.id), getAvailability(null, listing.id)])
   const beds = listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? '' : 's'}`
 
   return (
-    <div className="mx-auto w-full max-w-page px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto w-full max-w-page px-4 pt-6 pb-28 sm:px-6 sm:pt-8 lg:pb-10">
       <header className="mb-5">
         <p className="rubric">
           {listing.area} · {listing.city}, {listing.state}
@@ -119,16 +123,19 @@ async function Listing({ params, searchParams }: PageProps<'/stays/[slug]'>) {
           </section>
         </div>
 
-        <aside aria-label="Book this stay" className="lg:sticky lg:top-6 lg:self-start" data-viewer={actor ? 'signed-in' : 'visitor'}>
-          <div className="panel p-5">
-            <p className="text-2xl font-semibold figures">
-              {formatPrice(listing.nightlyKobo)} <span className="text-base font-normal text-muted">a night</span>
-            </p>
-            {listing.weekendKobo ? <p className="text-sm text-muted">Friday and Saturday nights {formatPrice(listing.weekendKobo)}</p> : null}
-            <p className="mt-3 text-sm text-muted">
-              {query.checkin && query.checkout ? `Your dates: ${query.checkin} to ${query.checkout}.` : 'Choose dates to see the total.'}
-            </p>
-          </div>
+        <aside aria-label="Book this stay" className="lg:sticky lg:top-6 lg:self-start">
+          <BookingPanel
+            listing={{ id: listing.id, slug: listing.slug, nightlyKobo: listing.nightlyKobo, maxGuests: listing.maxGuests }}
+            availability={availability}
+            initial={{
+              checkIn: query.checkin && isValidDate(query.checkin) ? query.checkin : null,
+              checkOut: query.checkout && isValidDate(query.checkout) ? query.checkout : null,
+              guests: Number.parseInt(query.guests ?? '1', 10) || 1,
+            }}
+            signedIn={Boolean(actor)}
+            isOwn={actor?.id === listing.hostId}
+            idempotencyKey={randomUUID()}
+          />
         </aside>
       </div>
     </div>
