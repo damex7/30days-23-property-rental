@@ -27,11 +27,15 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
        + ((('x' || substr(md5(listing_id::text || salt::text), 1, 4))::bit(16)::integer / 65535.0) - 0.5) * 0.008
 $$;
 
+-- public.approx_coord, schema-qualified: PostgreSQL 17 builds indexes with
+-- search_path = pg_catalog, pg_temp (a "safe search_path" for maintenance
+-- operations), so an unqualified call from inside an index expression
+-- wouldn't be found.
 CREATE OR REPLACE FUNCTION approx_lat(lat numeric, listing_id uuid) RETURNS numeric
-LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT round(approx_coord(lat, listing_id, 1), 5) $$;
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT round(public.approx_coord(lat, listing_id, 1), 5) $$;
 
 CREATE OR REPLACE FUNCTION approx_lng(lng numeric, listing_id uuid) RETURNS numeric
-LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT round(approx_coord(lng, listing_id, 2), 5) $$;
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT round(public.approx_coord(lng, listing_id, 2), 5) $$;
 
 -- THE MAP BOX FILTERS ON THE APPROXIMATE COORDINATES TOO. If "search as I
 -- move the map" compared the EXACT lat/lng, anyone could find a flat's real
@@ -41,4 +45,4 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT round(approx_coord(lng, listin
 -- An EXPRESSION index (allowed because the functions are IMMUTABLE) keeps
 -- that filter indexed; it replaces 007's index on the exact columns.
 DROP INDEX IF EXISTS listings_pub_geo_idx;
-CREATE INDEX listings_pub_approx_geo_idx ON listings (approx_lat(lat, id), approx_lng(lng, id)) WHERE status = 'published';
+CREATE INDEX listings_pub_approx_geo_idx ON listings (public.approx_lat(lat, id), public.approx_lng(lng, id)) WHERE status = 'published';
