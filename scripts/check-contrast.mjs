@@ -5,8 +5,8 @@
 // uses against WCAG 2.2 contrast minimums, in light AND dark mode:
 //   text  4.5:1  normal-size text
 //   ui    3:1    non-text UI: input borders, the focus ring, progress fills
-// Colours with transparency (Lavender at 78% for dark-mode secondary text)
-// are blended onto the background first, as the browser does.
+// Colours with transparency are blended onto the background first, as the
+// browser does.
 // Exits with code 1 if any pair fails, so it can run in CI.
 import { readFileSync } from 'node:fs'
 
@@ -44,31 +44,35 @@ function ratio(fgColour, bgColour) {
 }
 
 // [foreground, background, kind, where it's used]
+// Form fields never sit directly on `sunken` (the edge is only 2.8:1 there):
+// the filter sheet and the photo queue put them on a card first.
 const PAIRS = [
-  ['ink', 'page', 'text', 'body text and headings on the page'],
-  ['ink', 'card', 'text', 'text on cards'],
+  ['ink', 'page', 'text', 'body text and headings on the concrete page'],
+  ['ink', 'card', 'text', 'text on cards and panels'],
+  ['ink', 'sunken', 'text', 'text in the filter sheet, calendar header, empty states'],
   ['ink', 'well', 'text', 'typed text in inputs'],
-  ['ink', 'selected', 'text', 'selected rows, hovered links, the chosen option'],
-  ['muted', 'page', 'text', 'secondary text, the top bar and navigation'],
-  ['muted', 'card', 'text', 'hints and dates on cards, the bottom nav'],
-  ['muted', 'well', 'text', 'muted text in inputs and day headings'],
-  ['primary', 'page', 'text', 'links, the active tab'],
-  ['primary', 'card', 'text', 'links on cards, "Edit" summaries'],
-  ['on-primary', 'primary', 'text', 'primary buttons'],
+  ['muted', 'page', 'text', 'secondary text on the page'],
+  ['muted', 'card', 'text', 'hints, dates and details on cards'],
+  ['muted', 'sunken', 'text', 'secondary text in sunken areas, booked nights'],
+  ['primary', 'page', 'text', 'links and the brand name'],
+  ['primary', 'card', 'text', 'links on cards, the wishlist heart'],
+  ['primary', 'sunken', 'text', 'links in sunken areas'],
+  ['on-primary', 'primary', 'text', 'primary buttons, selected check-in/out dates'],
   ['on-primary', 'primary-hover', 'text', 'primary buttons (hover)'],
-  ['money-in', 'page', 'text', '+ money in'],
-  ['money-in', 'card', 'text', '+ money in on cards'],
-  ['money-out', 'page', 'text', '− money out, over budget'],
-  ['money-out', 'card', 'text', '− money out on cards'],
-  ['warn', 'page', 'text', '80% used'],
-  ['warn', 'card', 'text', '80% used on cards'],
-  ['edge', 'page', 'ui', 'input and button borders'],
-  ['edge', 'card', 'ui', 'input borders on cards'],
-  ['primary', 'card', 'ui', 'focus ring'],
-  ['bar', 'track', 'ui', 'progress bar (on track) against its track'],
-  ['warn', 'track', 'ui', 'progress bar (80% used) against its track'],
-  ['money-out', 'track', 'ui', 'progress bar (over budget) against its track'],
-  ['bar', 'card', 'ui', 'chart bars and lines on cards'],
+  ['on-range', 'range', 'text', 'the nights between check-in and check-out'],
+  ['on-sand', 'sand', 'text', 'price tags, map pins, the Total pill, Pending review'],
+  ['sand-ink', 'page', 'text', 'star ratings and "Guest favourite" on the page'],
+  ['sand-ink', 'card', 'text', 'star ratings on cards'],
+  ['danger', 'card', 'text', 'error messages'],
+  ['danger', 'page', 'text', 'error messages on the page'],
+  ['success', 'card', 'text', 'success messages, the weekly discount line'],
+  ['on-footer', 'footer', 'text', 'footer text'],
+  ['on-footer-muted', 'footer', 'text', 'footer secondary text'],
+  ['edge', 'card', 'ui', 'form field borders on cards (WCAG 1.4.11)'],
+  ['edge', 'page', 'ui', 'form field and secondary button borders on the page'],
+  ['primary', 'card', 'ui', 'focus ring, checkboxes, the heart icon'],
+  ['primary', 'page', 'ui', 'focus ring on the page'],
+  ['danger', 'card', 'ui', 'invalid field border'],
 ]
 
 let failed = 0

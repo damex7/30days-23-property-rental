@@ -74,7 +74,11 @@ export function FilterPanel({ children, activeCount }: { children: ReactNode; ac
         ) : (
           <h2 id={titleId} className="sr-only">Filters</h2>
         )}
-        <div className={cn(open && 'flex-1 p-4')}>{children}</div>
+        {/* The sheet is sunken concrete; the fields sit on a CARD inside it, where
+            their #8A8891 border has the 3:1 contrast inputs need (2.8:1 on sunken). */}
+        <div className={cn(open && 'flex-1 p-4')}>
+          <div className={cn(open && 'rounded-card border border-rule bg-card p-4')}>{children}</div>
+        </div>
       </div>
     </>
   )
