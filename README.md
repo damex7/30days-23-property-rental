@@ -102,9 +102,10 @@ The seed passwords are `SEED_USER_PASSWORD` and `SEED_ADMIN_PASSWORD`, at least 
    | `SEED_USER_PASSWORD`, `SEED_ADMIN_PASSWORD` | Only needed where you run the seed |
    | `DEMO_MODE` | `true` (default) shows the demo buttons; `false` hides them and turns the routes off |
 
-3. **The cron job.** `vercel.json` schedules `GET /api/cron/daily` at `0 5 * * *`, which is 06:00 in Lagos (Vercel crons are in UTC). The route answers 401 to anyone without the bearer secret.
-4. In Paystack, point the webhook at `https://your-project.vercel.app/api/webhooks/paystack`.
-5. Run `npm run db:migrate` and `npm run db:seed` from your machine with the production `DATABASE_URL` (or a Neon branch).
+3. **The region.** `vercel.json` pins the functions to `fra1` (Frankfurt), next to the Neon database in `eu-central-1`. Every statement inside a transaction is a network round trip, so the function and the database should be in the same place.
+4. **The cron job.** `vercel.json` schedules `GET /api/cron/daily` at `0 5 * * *`, which is 06:00 in Lagos (Vercel crons are in UTC). The route answers 401 to anyone without the bearer secret.
+5. In Paystack, point the webhook at `https://your-project.vercel.app/api/webhooks/paystack`.
+6. Run `npm run db:migrate` and `npm run db:seed` from your machine with the production `DATABASE_URL` (or a Neon branch).
 
 ## 3. Diagrams
 
