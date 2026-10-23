@@ -76,20 +76,29 @@ export type SearchRow = z.infer<typeof SearchRow>
 export function searchConditions(f: SearchQuery): Sql[] {
   const where: Sql[] = [q`l.status = 'published'`]
 
-  if (f.where) {
-    // FULL-TEXT for whole words anywhere in title, area, city or description
-    // (both dictionaries: 'english' stems "apartments" to match the
-    // description, 'simple' keeps place names whole), OR TRIGRAM WORD
-    // SIMILARITY on the area and city for misspellings and fragments: "Leki"
-    // <% "Lekki Phase 1" asks "is 'leki' close to some WORD-ish part of the
-    // area?" (word_similarity ≥ 0.6), which a short typed word needs; plain
-    // similarity() would compare it with the whole long name and fail.
-    where.push(q`(
-      l.search @@ (websearch_to_tsquery('english', ${f.where}) || websearch_to_tsquery('simple', ${f.where}))
-      OR ${f.where} <% l.area
-      OR ${f.where} <% l.city
-    )`)
-  }
+  if (f.where) where.push(whereMatch(f.where))
+  return [...where, ...otherConditions(f)]
+}
+
+/**
+ * THE PLACE MATCH: FULL-TEXT for whole words anywhere in title, area, city
+ * or description (both dictionaries: 'english' stems "apartments" to match
+ * the description, 'simple' keeps place names whole), OR TRIGRAM WORD
+ * SIMILARITY on the area and city for misspellings and fragments: "Leki"
+ * <% "Lekki Phase 1" asks "is 'leki' close to some word-ish part of the
+ * area?" (word_similarity ≥ 0.6), which a short typed word needs; plain
+ * similarity() would compare it with the whole long name and fail.
+ */
+function whereMatch(text: string): Sql {
+  return q`(
+    l.search @@ (websearch_to_tsquery('english', ${text}) || websearch_to_tsquery('simple', ${text}))
+    OR ${text} <% l.area
+    OR ${text} <% l.city
+  )`
+}
+
+function otherConditions(f: SearchQuery): Sql[] {
+  const where: Sql[] = []
 
   if (f.checkIn && f.checkOut && f.nights) {
     // AVAILABILITY: free on EVERY requested night. NOT EXISTS stops at the
@@ -174,8 +183,15 @@ export async function searchListings(db: Db, f: SearchQuery): Promise<SearchRow[
   return rows(db, SearchRow, searchSql(f), 'searchListings')
 }
 
+/** Does the place match ANY published listing, whatever the other filters? (Decides whether "Did you mean" makes sense.) */
+export async function placeMatchesAnything(db: Db, text: string): Promise<boolean> {
+  const result = await db.query(q`SELECT 1 FROM listings l WHERE l.status = 'published' AND ${whereMatch(text)} LIMIT 1`)
+  return result.length > 0
+}
+
 /**
- * "DID YOU MEAN?": only asked when a search with a place found nothing.
+ * "DID YOU MEAN?": only asked when the PLACE itself matched nothing (not
+ * when it matched but the dates or filters ruled everything out).
  * The published area (or city) most similar to what was typed, if it's at
  * least a little similar (similarity > 0.2).
  */

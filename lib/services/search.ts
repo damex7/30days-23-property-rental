@@ -175,7 +175,10 @@ export async function searchStays(actor: Actor, params: SearchParams): Promise<S
   }))
 
   const total = after ? null : (rows[0]?.totalCount ?? 0)
-  const suggestion = total === 0 && filters.where ? await repo.closestPlace(http, filters.where) : null
+  // "Did you mean" only when the PLACE matched nothing at all; if it matched
+  // but the dates or filters ruled everything out, the empty state offers
+  // to remove a filter instead.
+  const suggestion = total === 0 && filters.where && !(await repo.placeMatchesAnything(http, filters.where)) ? await repo.closestPlace(http, filters.where) : null
   return { items, nextCursor, filters, total, notes, suggestion: suggestion && suggestion.place.toLowerCase() !== filters.where ? suggestion : null, restarted }
 }
 
