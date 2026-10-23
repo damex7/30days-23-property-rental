@@ -13,9 +13,9 @@ const nextConfig: NextConfig = {
     // use our image optimiser as a free proxy for any URL on the internet.
     // Our photos live in Vercel Blob: <store-id>.public.blob.vercel-storage.com.
     remotePatterns: [{ protocol: 'https', hostname: '*.public.blob.vercel-storage.com', pathname: '/listings/**', search: '' }],
-    // Local images: only the seed's room illustrations, without query
-    // strings. (They're SVGs, which next/image serves unoptimised on its own,
-    // so dangerouslyAllowSVG stays off.)
+    // Local images: only the seed's room photos (JPEG and WebP, CC0, see
+    // public/seed/CREDITS.md), without query strings. next/image resizes
+    // them for each card and serves AVIF/WebP to browsers that accept it.
     localPatterns: [{ pathname: '/seed/**', search: '' }],
   },
 

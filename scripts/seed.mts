@@ -14,14 +14,16 @@
 //   - booked nights (some confirmed and paid, some in the past and completed,
 //     with reviews), host-blocked nights, and a festive-season price rule
 //
-// Photos are the SVG room illustrations in /public/seed: NOT uploaded to
-// Blob (the seed shouldn't need a Blob token), so their URLs are /seed/...
-// which the listing_photos CHECK allows alongside the Blob store.
+// Photos are real room photographs in /public/seed (CC0, credited in
+// public/seed/CREDITS.md), NOT uploaded to Blob (the seed shouldn't need a
+// Blob token), so their URLs are /seed/... which the listing_photos CHECK
+// allows alongside the Blob store (db/migrations/012).
 //
 // Every booking's price snapshot comes from lib/pricing.ts, the same function
 // Reserve uses, so the totals pass the stays_total_adds_up CHECK.
 
 import { randomBytes } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { demoAddress } from '@/lib/auth/email'
 import { hashPassword } from '@/lib/auth/password'
 import { http, type Db } from '@/lib/db/executor'
@@ -145,16 +147,27 @@ const LISTINGS: SeedListing[] = [
   { slug: 'wuse-2-loft-pending', host: 'amaka@example.com', title: 'Wuse 2 loft above the shops', type: 'apartment', bedrooms: 1, bathrooms: 1, guests: 2, state: 'FCT', city: 'Abuja', area: 'Wuse 2', address: '27 Ademola Adetokunbo Crescent, Wuse 2', lat: 9.0769, lng: 7.4781, nightly: 65_000, weekend: 70_000, cleaning: 8_000, deposit: 30_000, weekly: 10, minNights: 1, maxNights: 30, policy: 'flexible', amenities: ['power-24-7', 'inverter', 'wifi', 'ac', 'security'], rooms: ['bedroom-4', 'living-1', 'bathroom-4'], description: 'A bright loft above the shops on Ademola Adetokunbo, close to everything in Wuse 2. Submitted for review.', status: 'pending_review' },
 ]
 
-/** A readable alt text for each illustration, the kind a host would write. */
+/**
+ * The seed photos in /public/seed: real room photographs released as CC0
+ * (public/seed/CREDITS.md), some JPEG and some WebP. "living-1" → the file
+ * that exists, so the seed never points at a missing image.
+ */
+const SEED_DIR = new URL('../public/seed/', import.meta.url)
+function seedPhoto(room: string): string {
+  for (const ext of ['jpg', 'webp']) if (existsSync(new URL(`${room}.${ext}`, SEED_DIR))) return `${room}.${ext}`
+  throw new Error(`No seed photo for ${room} in public/seed`)
+}
+
+/** A readable alt text for each kind of photo, the kind a host would write. */
 const ALT: Record<string, string> = {
-  living: 'Living room with a sofa, a framed print and a large window',
-  bedroom: 'Bedroom with a made-up double bed, side lamp and window',
-  kitchen: 'Fitted kitchen with cupboards, a counter and a window over the sink',
-  bathroom: 'Tiled bathroom with a bathtub, shower and vanity unit',
-  balcony: 'Balcony with two chairs looking out over the city',
-  exterior: 'Outside of the building with jacaranda trees by the gate',
-  pool: 'Swimming pool with a lounger and palm trees',
-  workspace: 'Desk with a monitor and chair by a window',
+  living: 'Living room with a sofa and soft daylight',
+  bedroom: 'Bedroom with a made-up double bed by the window',
+  kitchen: 'Fitted kitchen with a worktop and built-in oven',
+  bathroom: 'Bathroom with a bathtub and a vanity unit',
+  balcony: 'Balcony with seating and an outdoor view',
+  exterior: 'Outside of the apartment building',
+  pool: 'Swimming pool with clear blue water',
+  workspace: 'Desk by a window with a computer',
 }
 
 const PAST_GUESTS = ['chioma@example.com', 'segun@example.com', 'ifeanyi@example.com', 'aisha@example.com']
@@ -212,7 +225,7 @@ async function seedListings(ids: Map<string, string>): Promise<void> {
       for (const [position, room] of l.rooms.entries()) {
         const kind = room.split('-')[0]!
         await tx.query(q`INSERT INTO listing_photos (listing_id, host_id, blob_url, blob_pathname, width, height, alt_text, position)
-                         VALUES (${listingId}, ${hostId}, ${`/seed/${room}.svg`}, ${`seed/${room}.svg`}, 1200, 800, ${ALT[kind] ?? 'A room in the flat'}, ${position})`)
+                         VALUES (${listingId}, ${hostId}, ${`/seed/${seedPhoto(room)}`}, ${`seed/${seedPhoto(room)}`}, 1024, 683, ${ALT[kind] ?? 'A room in the flat'}, ${position})`)
       }
       await tx.query(q`INSERT INTO listing_amenities (listing_id, amenity_code) SELECT ${listingId}, unnest(${l.amenities}::text[])`)
       if (l.festive) {
@@ -258,9 +271,27 @@ async function seedListings(ids: Map<string, string>): Promise<void> {
   console.log(`✓ listings: ${created} created, ${LISTINGS.length - created} already there (ratings refreshed on ${refreshed})`)
 }
 
+/**
+ * A database seeded BEFORE the photos became real photographs still points
+ * at /seed/*.svg files that no longer exist. Point those rows at the
+ * matching photo (same room, same number) with the new alt text. Safe to
+ * run any number of times: once updated, no row matches.
+ */
+async function refreshSeedPhotos(): Promise<void> {
+  const old = await http.query(q`SELECT id, blob_url FROM listing_photos WHERE blob_url LIKE '/seed/%.svg'`)
+  for (const row of old) {
+    const room = String(row.blob_url).replace(/^\/seed\//, '').replace(/\.svg$/, '')
+    const file = seedPhoto(room)
+    await http.query(q`UPDATE listing_photos SET blob_url = ${`/seed/${file}`}, blob_pathname = ${`seed/${file}`}, width = 1024, height = 683,
+                           alt_text = ${ALT[room.split('-')[0]!] ?? 'A room in the flat'} WHERE id = ${String(row.id)}`)
+  }
+  console.log(`✓ seed photos: ${old.length} switched from drawings to photographs`)
+}
+
 try {
   const ids = await upsertPeople()
   await seedListings(ids)
+  await refreshSeedPhotos()
   console.log(`
 Sign in with:
   guest@example.com   (SEED_USER_PASSWORD)   a guest with an upcoming trip and a stay to review

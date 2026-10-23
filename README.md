@@ -58,7 +58,7 @@ npm run dev                    # http://localhost:3023
 
 **Neon.** Create a new project (or a branch) for Day 23 and copy the pooled connection string (the host has `-pooler`) into `DATABASE_URL`. You can optionally add the direct string as `DATABASE_URL_UNPOOLED`; only `db:migrate` uses it. The migrations enable `citext`, `pg_trgm` and `btree_gist`, all of which Neon allows.
 
-**Vercel Blob.** In the Vercel dashboard, go to Storage → Create → Blob, then open the store's `.env.local` tab and copy `BLOB_READ_WRITE_TOKEN`. The seed doesn't need it, because seed photos are local SVGs. Uploading new photos does.
+**Vercel Blob.** In the Vercel dashboard, go to Storage → Create → Blob, then open the store's `.env.local` tab and copy `BLOB_READ_WRITE_TOKEN`. The seed doesn't need it: seed photos are real room photographs in `public/seed`, released as CC0 and credited in `public/seed/CREDITS.md`. Uploading new photos does.
 
 **Paystack (test mode).**
 
