@@ -1,0 +1,259 @@
+@import "tailwindcss";
+
+/*
+ * STAYBOOK DESIGN TOKENS: "Concrete & Jacaranda".
+ * Abuja's purple jacaranda trees over grey city concrete, used 60/25/10/5:
+ *
+ *   60% CONCRETE   the surfaces: page, cards, sunken areas, hairlines
+ *   25% GRAPHITE   the words: headings, body text, secondary text, the footer
+ *   10% JACARANDA  the actions: buttons, links, the brand, focus rings, the
+ *                  wishlist heart, the chosen check-in and check-out dates
+ *    5% SAND       a few warm marks: price tags, the Total pill, "Pending review"
+ *
+ * The palette is defined ONCE here (concrete-*, graphite-*, jacaranda-*,
+ * sand-*), and components use the SEMANTIC names below (bg-card, text-ink,
+ * bg-primary ...), each a light-dark() pair: `color-scheme` (set from
+ * data-theme by the toggle, or the OS when there's no choice) picks the side.
+ * `--color-*: initial` removes Tailwind's default palette, so an off-palette
+ * `text-orange-500` doesn't even exist. Every pairing is checked by
+ * npm run check:contrast (4.5:1 for text, 3:1 for borders and icons).
+ */
+@theme {
+  --color-*: initial;
+
+  /* THE PALETTE (light) */
+  --color-concrete-50: #FCFBF9;   /* cards and panels */
+  --color-concrete-100: #F3F2EF;  /* the page */
+  --color-concrete-200: #E8E6E1;  /* sunken: filter sheet, photo placeholders, calendar header */
+  --color-concrete-300: #DAD8D2;  /* hairline borders */
+  --color-concrete-500: #8A8891;  /* form field borders (3:1 on cards) */
+  --color-graphite-900: #26252D;  /* headings and body text, the footer */
+  --color-graphite-600: #5B5A63;  /* secondary text */
+  --color-jacaranda-600: #6A4FA3; /* primary */
+  --color-jacaranda-700: #573E8E; /* primary hover */
+  --color-jacaranda-100: #ECE6F7; /* the nights between check-in and check-out */
+  --color-sand-400: #C9A66B;      /* fills only, behind graphite text */
+  --color-sand-700: #7F5E24;      /* sand as TEXT on concrete: stars, "Guest favourite" */
+  --color-error-600: #A3283C;
+  --color-success-600: #2E6A4B;
+
+  /* THE PALETTE (dark: "Abuja at night") */
+  --color-concrete-950: #17161B;
+  --color-concrete-900: #211F26;
+  --color-concrete-850: #2B2932;
+  --color-concrete-800: #3A3842;
+  --color-concrete-600: #6E6B76;
+  --color-graphite-50: #EDEBE6;
+  --color-graphite-300: #A9A6B0;
+  --color-jacaranda-300: #B9A4EC;
+  --color-jacaranda-950: #2E2640;
+  --color-sand-300: #DDBD82;
+  --color-error-300: #F08A98;
+  --color-success-300: #7FCB9F;
+
+  --color-white: #FFFFFF;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* SURFACES */
+  --color-page: light-dark(#F3F2EF, #17161B);
+  --color-card: light-dark(#FCFBF9, #211F26);
+  --color-raised: light-dark(#FCFBF9, #2B2932);
+  --color-sunken: light-dark(#E8E6E1, #2B2932);
+  /* A form field sits on a card, in the card's colour. */
+  --color-well: light-dark(#FCFBF9, #211F26);
+  /* Hover on a quiet button or row. */
+  --color-selected: light-dark(#E8E6E1, #2B2932);
+  --color-footer: light-dark(#26252D, #0F0E12);
+  --color-on-footer: light-dark(#F3F2EF, #EDEBE6);
+  --color-on-footer-muted: light-dark(#DAD8D2, #A9A6B0);
+
+  /* TEXT */
+  --color-ink: light-dark(#26252D, #EDEBE6);
+  --color-muted: light-dark(#5B5A63, #A9A6B0);
+
+  /* LINES: hairlines are decoration; field borders must be SEEN (3:1). */
+  --color-rule: light-dark(#DAD8D2, #3A3842);
+  --color-edge: light-dark(#8A8891, #6E6B76);
+
+  /* JACARANDA: buttons, links, focus, the heart, the chosen dates. */
+  --color-primary: light-dark(#6A4FA3, #B9A4EC);
+  --color-primary-hover: light-dark(#573E8E, #CDBDF2);
+  --color-on-primary: light-dark(#FFFFFF, #17161B);
+  /* The nights between check-in and check-out. */
+  --color-range: light-dark(#ECE6F7, #2E2640);
+  --color-on-range: light-dark(#26252D, #EDEBE6);
+
+  /* SAND: fills behind graphite text, and sand-as-text. */
+  --color-sand: light-dark(#C9A66B, #DDBD82);
+  --color-on-sand: light-dark(#26252D, #17161B);
+  --color-sand-ink: light-dark(#7F5E24, #DDBD82);
+
+  /* FUNCTIONAL: small messages only, always next to an icon or a word. */
+  --color-danger: light-dark(#A3283C, #F08A98);
+  --color-success: light-dark(#2E6A4B, #7FCB9F);
+
+  /* TYPE (variables from next/font in app/layout.tsx). */
+  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-fira-sans), system-ui, sans-serif;
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.875rem;
+  --radius-pill: 999px;
+
+  /* A well-kept register on a desk: a hairline and a soft graphite shadow. */
+  --shadow-card: 0 1px 0 rgb(38 37 45 / 0.05), 0 10px 24px -18px rgb(38 37 45 / 0.45);
+  --shadow-pop: 0 24px 48px -20px rgb(23 22 27 / 0.6);
+
+  --container-form: 36rem;
+  --container-page: 76rem;
+
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-rise: rise 0.2s ease-out both;
+
+  @keyframes shimmer {
+    from { background-position: 150% 0; }
+    to { background-position: -50% 0; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+  }
+}
+
+/*
+ * THEME SWITCHING without a flash. No attribute: follow the OS.
+ * data-theme="light"|"dark" is set before first paint by the inline script
+ * in app/layout.tsx (lib/theme.ts), so a saved choice never flashes the
+ * other theme.
+ */
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    overflow-wrap: break-word;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    font-variation-settings: "SOFT" 50, "opsz" 72;
+  }
+
+  p { text-wrap: pretty; }
+
+  /* ONE focus style everywhere: a 2px jacaranda ring with an offset, so it
+     never merges with a border. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  [tabindex="-1"]:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+  ::selection { background-color: var(--color-range); color: var(--color-on-range); }
+
+  a { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+
+  ::placeholder { color: var(--color-muted); opacity: 0.85; }
+
+  dialog::backdrop { background: rgb(23 22 27 / 0.6); }
+
+  /* Every price is a tabular, lining figure, so columns of Naira line up. */
+  table, .figures, input[inputmode="decimal"] { font-variant-numeric: tabular-nums lining-nums; }
+}
+
+/* Inputs: the card's colour with a visible 3:1 edge, and a heavy edge in
+   the error colour when invalid. The message under the field says what's
+   wrong, so colour is never the only signal. */
+@utility field {
+  background-color: var(--color-well);
+  border: 1px solid var(--color-edge);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  &[aria-invalid="true"] { border-color: var(--color-danger); border-width: 2px; }
+  &:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+}
+
+@utility figures { font-variant-numeric: tabular-nums lining-nums; }
+
+/* A link in body text: jacaranda, underlined (not colour alone). */
+@utility link {
+  color: var(--color-primary);
+  text-decoration-line: underline;
+  font-weight: 600;
+  &:hover { text-decoration-thickness: 2px; }
+}
+
+/* A CARD: warm white on concrete, a hairline, a soft shadow. */
+@utility panel {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* THE REGISTER LINE: a guesthouse register's ruled column head, a small-caps
+   label over a hairline. */
+@utility rubric {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+/* A SAND TAG: the price on a card or map pin, the Total pill. Graphite text
+   on sand (never sand text on sand). */
+@utility tag-sand {
+  background-color: var(--color-sand);
+  color: var(--color-on-sand);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* HATCHING for host-blocked nights: diagonal lines, so "blocked" is a
+   PATTERN and not only a colour. */
+@utility hatched {
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, var(--color-rule) 5px 7px);
+}
+
+/* Skeleton shimmer for loading states. */
+@utility skeleton {
+  background-image: linear-gradient(90deg, var(--color-sunken) 0%, var(--color-rule) 50%, var(--color-sunken) 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+  border-radius: var(--radius-control);
+}
+
+/* Leaflet's own stylesheet is imported by the map component; these make its
+   controls and attribution follow the theme. */
+.leaflet-container { font-family: var(--font-sans); background: var(--color-sunken); }
+.leaflet-control-attribution { background: color-mix(in srgb, var(--color-card) 90%, transparent) !important; color: var(--color-muted) !important; }
+.leaflet-control-attribution a { color: var(--color-primary) !important; }
+.leaflet-bar a { background: var(--color-card) !important; color: var(--color-ink) !important; border-color: var(--color-rule) !important; }
+/* OSM tiles are light; at night they're dimmed a little so the map isn't a glare. */
+:root[data-theme="dark"] .leaflet-tile-pane { filter: brightness(0.75) contrast(1.1); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .leaflet-tile-pane { filter: brightness(0.75) contrast(1.1); }
+}
+
+/* REDUCED MOTION: people who ask their OS for less motion get none. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
