@@ -23,7 +23,10 @@ export const isoDateSchema = z.string().refine(isValidDate, 'Choose a real date'
 // Rules that involve two fields (check-out after check-in, not in the past)
 // are applied by the service, which can say what it ignored and why.
 // ---------------------------------------------------------------------------
-const optionalInt = (min: number, max: number) => z.coerce.number().int().min(min).max(max).optional().catch(undefined)
+// An empty box in a GET form arrives as "min=" (an empty string), which
+// z.coerce.number would read as 0. Empty means "not set".
+const optionalInt = (min: number, max: number) =>
+  z.preprocess((value) => (value === '' ? undefined : value), z.coerce.number().int().min(min).max(max).optional()).catch(undefined)
 
 const BBOX_NUMBER = /^-?\d{1,3}(\.\d{1,6})?$/
 

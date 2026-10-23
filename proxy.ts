@@ -41,6 +41,19 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value
   const isApi = pathname.startsWith('/api/')
 
+  // CANONICAL SEARCH URLS: the filter form's checkboxes arrive as
+  // ?amenity=wifi&amenity=pool; send the browser to ?amenities=wifi,pool, the
+  // one shape the search page reads and people share.
+  if (pathname === '/stays' && request.nextUrl.searchParams.has('amenity')) {
+    const url = request.nextUrl.clone()
+    const picked = url.searchParams.getAll('amenity')
+    url.searchParams.delete('amenity')
+    url.searchParams.delete('cursor')
+    if (picked.length > 0) url.searchParams.set('amenities', picked.join(','))
+    else url.searchParams.delete('amenities')
+    return NextResponse.redirect(url, 303)
+  }
+
   if (!isApi) {
     if (token && /^[A-Za-z0-9_-]{43}$/.test(token)) {
       for (const [pattern, kind] of OWNED_PATHS) {
