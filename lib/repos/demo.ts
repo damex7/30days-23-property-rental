@@ -56,3 +56,16 @@ export async function deleteDemoGuest(db: Db, userId: string): Promise<boolean> 
   const result = await db.query(q`DELETE FROM users WHERE id = ${userId} AND is_demo AND role = 'guest' RETURNING id`)
   return result.length > 0
 }
+
+/** The demo host's published listings, cheapest first. */
+export async function demoHostListings(db: Db, hostEmail: string): Promise<string[]> {
+  const result = await rows(
+    db,
+    z.object({ id: z.uuid() }),
+    q`SELECT l.id FROM listings l JOIN users u ON u.id = l.host_id
+      WHERE u.email = ${hostEmail} AND u.is_demo AND l.status = 'published'
+      ORDER BY l.nightly_kobo, l.id`,
+    'demoHostListings',
+  )
+  return result.map((r) => r.id)
+}
