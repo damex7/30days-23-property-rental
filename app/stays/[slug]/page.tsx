@@ -4,16 +4,19 @@ import { notFound } from 'next/navigation'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
 import { BookingPanel } from '@/components/booking/booking-panel'
+import { ApproxMap } from '@/components/map/approx-map'
 import { AmenityList } from '@/components/stays/amenity-list'
 import { Gallery } from '@/components/stays/gallery'
 import { isGuestFavourite, Rating } from '@/components/stays/rating'
 import { ReviewsSection } from '@/components/stays/reviews-section'
+import { SaveButton } from '@/components/stays/save-button'
 import { ListingSkeleton } from '@/components/stays/listing-skeleton'
 import { formatPrice } from '@/lib/money'
 import { POLICY_LABELS, PROPERTY_TYPE_LABELS } from '@/lib/options'
 import { firstValues } from '@/lib/schemas'
 import { isServiceError } from '@/lib/services/errors'
 import { getAvailability } from '@/lib/services/bookings'
+import { isSavedByMe } from '@/lib/services/saved'
 import { getPublicListing, listAmenities } from '@/lib/services/listings'
 import { listingReviews } from '@/lib/services/reviews'
 import { getPageActor } from '@/lib/services/session-actor'
@@ -49,7 +52,8 @@ async function Listing({ params, searchParams }: PageProps<'/stays/[slug]'>) {
     if (isServiceError(error) && error.kind === 'not_found') notFound()
     throw error
   }
-  const [actor, amenities, reviews, availability] = await Promise.all([getPageActor(), listAmenities(null), listingReviews(null, listing.id), getAvailability(null, listing.id)])
+  const actor = await getPageActor()
+  const [amenities, reviews, availability, saved] = await Promise.all([listAmenities(actor), listingReviews(actor, listing.id), getAvailability(actor, listing.id), isSavedByMe(actor, listing.id)])
   const beds = listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? '' : 's'}`
 
   return (
@@ -58,7 +62,10 @@ async function Listing({ params, searchParams }: PageProps<'/stays/[slug]'>) {
         <p className="rubric">
           {listing.area} · {listing.city}, {listing.state}
         </p>
-        <h1 className="mt-1 text-[2rem] sm:text-5xl">{listing.title}</h1>
+        <div className="mt-1 flex items-start justify-between gap-3">
+          <h1 className="text-[2rem] sm:text-5xl">{listing.title}</h1>
+          <SaveButton listingId={listing.id} saved={saved} title={listing.title} signedIn={Boolean(actor)} />
+        </div>
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-muted">
           <Rating avg={listing.ratingAvg} count={listing.ratingCount} />
           {isGuestFavourite(listing.ratingAvg, listing.ratingCount) ? <span className="font-semibold text-sand-ink">Guest favourite</span> : null}
@@ -88,8 +95,8 @@ async function Listing({ params, searchParams }: PageProps<'/stays/[slug]'>) {
             <p className="mt-1 text-muted">
               {listing.area}, {listing.city}. The exact address and directions are shared after you book.
             </p>
-            <div id="approximate-map" className="mt-3">
-              {/* Stage 5 puts the approximate map circle here. */}
+            <div className="mt-3">
+              <ApproxMap lat={listing.approxLat} lng={listing.approxLng} area={listing.area} />
             </div>
           </section>
 

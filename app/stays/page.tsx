@@ -4,6 +4,8 @@ import { connection } from 'next/server'
 import { Suspense } from 'react'
 import { FilterPanel, SortSelect } from '@/components/search/filter-panel'
 import { SearchBox } from '@/components/search/search-box'
+import { StaysMap } from '@/components/map/stays-map'
+import { SaveButton } from '@/components/stays/save-button'
 import { StayCard, StayCardSkeleton } from '@/components/stays/stay-card'
 import { button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -110,6 +112,22 @@ async function Results({ searchParams }: Pick<PageProps<'/stays'>, 'searchParams
             </ul>
           ) : null}
 
+          {/* THE MAP: beside the list on a wide screen; on a phone, behind "Show map" so the list comes first. */}
+          <div className="mb-3 lg:hidden">
+            <Link href={stayHref(current, { view: raw.view === 'map' ? undefined : 'map' })} className={button.secondary}>
+              <Icon name="mapPin" />
+              {raw.view === 'map' ? 'Hide the map' : 'Show the map'}
+            </Link>
+          </div>
+          <div className={raw.view === 'map' ? '' : 'max-lg:hidden'}>
+            <StaysMap
+              listings={result.items.map((c) => ({ id: c.id, slug: c.slug, title: c.title, lat: c.approxLat, lng: c.approxLng, priceKobo: c.quote?.totalKobo ?? c.nightlyKobo, isTotal: Boolean(c.quote) }))}
+              current={current}
+              bbox={filters.bbox}
+              hrefSuffix={datesQuery}
+            />
+          </div>
+
           {result.items.length === 0 ? (
             <EmptyResults result={result} chips={chips} current={current} />
           ) : (
@@ -121,6 +139,7 @@ async function Results({ searchParams }: Pick<PageProps<'/stays'>, 'searchParams
                     quote={card.quote}
                     href={`/stays/${card.slug}${datesQuery}`}
                     priority={i < 3}
+                    heart={<SaveButton listingId={card.id} saved={card.saved} title={card.title} signedIn={Boolean(actor)} />}
                   />
                 </li>
               ))}
