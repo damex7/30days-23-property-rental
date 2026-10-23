@@ -9,7 +9,7 @@ import 'server-only'
 import { appUrl, emailTable, escapeHtml, layout, sendEmail, type Email } from '@/lib/auth/email'
 import { http } from '@/lib/db/executor'
 import { q } from '@/lib/db/sql'
-import { formatClock } from '@/lib/format'
+import { formatClock, plural } from '@/lib/format'
 import { formatNaira } from '@/lib/money'
 import { summariseNights } from '@/lib/pricing'
 import * as paymentsRepo from '@/lib/repos/payments'
@@ -77,11 +77,11 @@ export async function sendConfirmationEmails(stayId: string): Promise<void> {
     await claimAndSend('booking_confirmed_host', stay.id, {
       to: host.email,
       subject: `New booking: ${stay.listingTitle}, ${formatRange(stay.checkIn, stay.checkOut)}`,
-      text: `Hello ${host.name},\n\n${stay.guestName ?? 'A guest'} booked ${stay.listingTitle} for ${when} (${stay.nightsCount} nights, ${stay.guestsCount} guests).\n\nTotal paid: ${formatNaira(stay.totalKobo ?? 0)}\n\n${appUrl('/host/bookings')}`,
+      text: `Hello ${host.name},\n\n${stay.guestName ?? 'A guest'} booked ${stay.listingTitle} for ${when} (${plural(stay.nightsCount, 'night')}, ${plural(stay.guestsCount ?? 1, 'guest')}).\n\nTotal paid: ${formatNaira(stay.totalKobo ?? 0)}\n\n${appUrl('/host/bookings')}`,
       html: layout(
         'New booking',
         [
-          `<strong>${escapeHtml(stay.guestName ?? 'A guest')}</strong> booked ${escapeHtml(stay.listingTitle)} for ${escapeHtml(when)}: ${stay.nightsCount} nights, ${stay.guestsCount} guest${stay.guestsCount === 1 ? '' : 's'}.`,
+          `<strong>${escapeHtml(stay.guestName ?? 'A guest')}</strong> booked ${escapeHtml(stay.listingTitle)} for ${escapeHtml(when)}: ${plural(stay.nightsCount, 'night')}, ${plural(stay.guestsCount ?? 1, 'guest')}.`,
           emailTable(priceRows(stay)),
         ],
         { label: 'See your bookings', url: appUrl('/host/bookings') },
