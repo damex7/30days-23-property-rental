@@ -521,6 +521,14 @@ Every percentage is rounded half up to whole kobo with integer arithmetic only (
 
 **Why client uploads.** A Vercel function's request body is limited to about 4.5 MB. A 5 MB photo sent through a Server Action would be refused, and a slow upload from a phone would keep a function running (and billed) the whole time. With client uploads, the browser asks our route for a one-time token, then sends the file straight to Blob. The bytes never touch our function.
 
+**Location data is removed first.** Phone photos carry EXIF metadata, often including the GPS position where the picture was taken: for a photo of a flat, its exact location. Publishing that would undo the location privacy rule ([§9](#9-the-location-privacy-rule)). So before anything is uploaded, the browser draws each photo onto a canvas and exports a clean copy (`cleanCopy` in `components/host/photo-manager.tsx`):
+
+- only the pixels survive: no GPS, no camera serial, no date;
+- the photo is turned upright (EXIF orientation applied);
+- it is shrunk to at most 2560 px on its longest side.
+
+Originals up to 25 MB are accepted; the clean copy must be 5 MB or less, and that copy is what gets uploaded.
+
 **The checks** (`app/api/photos/upload/route.ts`, then `lib/services/photos.ts`):
 
 1. The token request must be same-origin and signed in, and is rate-limited per user.
@@ -823,7 +831,7 @@ Worth adding next:
 
 - **PostGIS** (`geography` plus a GiST index) once there are tens of thousands of listings. "Within 3 km of me" and true distance sorting would then be indexed.
 - **Search ranking by relevance** (`ts_rank` plus trigram similarity) for the "recommended" sort when a place is typed, with a keyset key that includes it.
-- **An image pipeline:** blurhash placeholders and EXIF stripping (photos can carry the flat's GPS position, which would undo the privacy rule) before saving.
+- **Server-side image checks:** blurhash placeholders, and decoding each upload on the server to confirm it really is an image. Metadata is already stripped in the browser, but a hand-made upload with a valid token could still carry it.
 - **A real refunds desk** for admins: process pending refunds through Paystack's refund API.
 - **Per-night availability caching** (a materialised calendar) if the `NOT EXISTS` ever becomes the slow part.
 - **Host response-time and cancellation-rate** badges, computed in SQL like occupancy.

@@ -17,19 +17,53 @@ type Queued = { key: string; file: File; preview: string; alt: string; status: '
 
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
-/** The pixel size, read in the browser (so next/image can reserve the right space). */
-async function dimensions(file: File): Promise<{ width: number; height: number }> {
-  const bitmap = await createImageBitmap(file)
-  const size = { width: bitmap.width, height: bitmap.height }
+/** Originals straight off a phone can be big; they're shrunk before upload, so allow up to this. */
+const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024
+/** The longest side after cleaning: plenty for a full-width photo on a large screen. */
+const MAX_EDGE = 2560
+
+function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('This photo couldn’t be read.'))), type, quality))
+}
+
+/**
+ * A CLEAN COPY of the photo, made in the browser before upload.
+ *
+ * Phone photos carry EXIF metadata, and that often includes the GPS
+ * position where the picture was taken: for a photo of a flat, its exact
+ * location. Publishing it would undo the location privacy rule (only a
+ * confirmed guest learns the address). Drawing the image onto a canvas and
+ * exporting it keeps only the PIXELS: no GPS, no camera serial, no date.
+ * The same pass turns the photo upright (EXIF orientation applied), shrinks
+ * it to at most 2560 px on its longest side, and reports its real size.
+ */
+async function cleanCopy(file: File): Promise<{ blob: Blob; width: number; height: number; type: string }> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+  const width = Math.round(bitmap.width * scale)
+  const height = Math.round(bitmap.height * scale)
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('This browser can’t prepare photos for upload.')
+  context.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
-  return size
+  // PNGs stay PNG (they may be plans or graphics); photos become JPEG or WebP.
+  const type = file.type === 'image/png' || file.type === 'image/webp' ? file.type : 'image/jpeg'
+  let blob = await toBlob(canvas, type, 0.88)
+  if (blob.size > MAX_PHOTO_BYTES && type !== 'image/png') blob = await toBlob(canvas, type, 0.75)
+  if (blob.size > MAX_PHOTO_BYTES) throw new Error('Even after shrinking, this photo is over 5 MB. Try a JPEG instead.')
+  return { blob, width, height, type }
 }
 
 /**
  * THE PHOTO MANAGER.
- * - Choose up to 12 JPEG, PNG or WebP files (5 MB each). Wrong type or too
- *   big is refused here at once, with the reason, per file; the server and
- *   Blob refuse them again whatever this code does.
+ * - Choose up to 12 JPEG, PNG or WebP files. Each is CLEANED first (see
+ *   cleanCopy: GPS and other metadata removed, shrunk to 2560 px), and the
+ *   clean copy must be 5 MB or less. Wrong type or too big is refused here,
+ *   with the reason, per file; the server and Blob refuse them again
+ *   whatever this code does.
  * - Every photo needs ALT TEXT (what a screen reader user hears instead of
  *   seeing it): the Upload button stays off until it's written.
  * - Each file shows its own progress and its own failure, announced politely.
@@ -67,7 +101,7 @@ export function PhotoManager({ listingId, photos, readOnly }: { listingId: strin
       const key = `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`
       const base = { key, file, preview: URL.createObjectURL(file), alt: '', progress: 0 }
       if (!(PHOTO_TYPES as readonly string[]).includes(file.type)) added.push({ ...base, status: 'failed', error: 'Only JPEG, PNG or WebP photos.' })
-      else if (file.size > MAX_PHOTO_BYTES) added.push({ ...base, status: 'failed', error: `Too big (${(file.size / 1024 / 1024).toFixed(1)} MB). The limit is 5 MB.` })
+      else if (file.size > MAX_ORIGINAL_BYTES) added.push({ ...base, status: 'failed', error: `Too big (${(file.size / 1024 / 1024).toFixed(1)} MB). Choose a photo under 25 MB.` })
       else if (space <= 0) added.push({ ...base, status: 'failed', error: `A listing can have up to ${MAX_PHOTOS} photos.` })
       else {
         added.push({ ...base, status: 'ready' })
@@ -87,15 +121,16 @@ export function PhotoManager({ listingId, photos, readOnly }: { listingId: strin
     patch(item.key, { status: 'uploading', progress: 0, error: undefined })
     setAnnouncement(`Uploading ${item.file.name}.`)
     try {
-      const { width, height } = await dimensions(item.file)
+      // The clean copy (no GPS or other metadata) is what gets uploaded, never the original.
+      const { blob: clean, width, height, type } = await cleanCopy(item.file)
       // A RANDOM pathname under this listing: unguessable, and the server
       // checks it really is under this listing before issuing the token.
-      const pathname = `listings/${listingId}/${crypto.randomUUID().replace(/-/g, '')}.${EXT[item.file.type] ?? 'jpg'}`
-      const blob = await upload(pathname, item.file, {
+      const pathname = `listings/${listingId}/${crypto.randomUUID().replace(/-/g, '')}.${EXT[type] ?? 'jpg'}`
+      const blob = await upload(pathname, clean, {
         access: 'public',
         handleUploadUrl: '/api/photos/upload',
         clientPayload: JSON.stringify({ listingId }),
-        contentType: item.file.type,
+        contentType: type,
         onUploadProgress: ({ percentage }) => patch(item.key, { progress: Math.round(percentage) }),
       })
       patch(item.key, { status: 'saving', progress: 100 })
@@ -188,7 +223,7 @@ export function PhotoManager({ listingId, photos, readOnly }: { listingId: strin
       {!readOnly ? (
         <section aria-labelledby={`${inputId}-title`} className="mt-6 rounded-card border border-dashed border-edge bg-sunken p-4">
           <h3 id={`${inputId}-title`} className="font-sans text-base font-semibold">Add photos</h3>
-          <p className="text-sm text-muted">JPEG, PNG or WebP, up to 5 MB each. {room > 0 ? `Room for ${room} more.` : 'This listing has the maximum of 12.'}</p>
+          <p className="text-sm text-muted">JPEG, PNG or WebP, up to 25 MB each. Location data (GPS) is removed from each photo before it leaves your device. {room > 0 ? `Room for ${room} more.` : 'This listing has the maximum of 12.'}</p>
           <label htmlFor={inputId} className={cn(button.secondary, 'mt-3 cursor-pointer', room <= 0 && 'pointer-events-none opacity-50')}>
             <Icon name="upload" />
             Choose photos
@@ -203,7 +238,7 @@ export function PhotoManager({ listingId, photos, readOnly }: { listingId: strin
                   <img src={item.preview} alt="" className="h-24 w-36 shrink-0 rounded-control object-cover" />
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="truncate text-sm font-semibold">{item.file.name}</p>
-                    {item.status === 'ready' || (item.status === 'failed' && (PHOTO_TYPES as readonly string[]).includes(item.file.type) && item.file.size <= MAX_PHOTO_BYTES) ? (
+                    {item.status === 'ready' || (item.status === 'failed' && (PHOTO_TYPES as readonly string[]).includes(item.file.type) && item.file.size <= MAX_ORIGINAL_BYTES) ? (
                       <>
                         <label htmlFor={`alt-${item.key}`} className="block text-sm font-semibold">Describe this photo</label>
                         <input
