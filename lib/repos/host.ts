@@ -53,7 +53,7 @@ export async function earnings(db: Db, hostId: string): Promise<{ allTimeKobo: n
     q`SELECT
         coalesce(sum(subtotal_kobo - discount_kobo + cleaning_fee_kobo) FILTER (WHERE status = 'completed'), 0) AS "allTimeKobo",
         coalesce(sum(subtotal_kobo - discount_kobo + cleaning_fee_kobo) FILTER (WHERE status IN ('confirmed', 'completed')
-          AND date_trunc('month', lower(nights)) = date_trunc('month', now() AT TIME ZONE 'Africa/Lagos')), 0) AS "thisMonthKobo",
+          AND date_trunc('month', lower(nights)::timestamp) = date_trunc('month', now() AT TIME ZONE 'Africa/Lagos')), 0) AS "thisMonthKobo",
         coalesce(sum(subtotal_kobo - discount_kobo + cleaning_fee_kobo) FILTER (WHERE status = 'confirmed'), 0) AS "upcomingKobo"
       FROM stays WHERE host_id = ${hostId} AND kind = 'booking'`,
     'earnings',

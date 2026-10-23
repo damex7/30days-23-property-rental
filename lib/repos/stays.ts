@@ -314,27 +314,27 @@ export async function insertBlock(db: Db, hostId: string, listingId: string, sta
  * touches the range is cancelled, and the parts of it OUTSIDE the range are
  * put back as new blocks. Multirange subtraction does the arithmetic:
  *   datemultirange('[10,20)') - datemultirange('[13,15)') = {[10,13), [15,20)}
- * Returns how many blocks were changed.
+ * Two statements, run inside the caller's transaction: the old blocks leave
+ * the constraint's held/confirmed set FIRST, so the trimmed pieces never
+ * overlap a live block when they're inserted. Returns how many blocks changed.
  */
 export async function unblockRange(db: Db, hostId: string, listingId: string, start: string, end: string): Promise<number> {
-  const result = await rows(
+  const removed = await rows(
     db,
-    z.object({ count: z.number().int() }),
-    q`WITH removed AS (
-        UPDATE stays SET status = 'cancelled', cancelled_at = now(), cancelled_by = 'host'
-        WHERE kind = 'host_block' AND status = 'confirmed' AND listing_id = ${listingId} AND host_id = ${hostId}
-          AND nights && daterange(${start}::date, ${end}::date)
-        RETURNING nights, block_note
-      ), kept AS (
-        INSERT INTO stays (kind, listing_id, host_id, nights, status, block_note)
-        SELECT 'host_block', ${listingId}, ${hostId}, piece, 'confirmed', removed.block_note
-        FROM removed, unnest(datemultirange(removed.nights) - datemultirange(daterange(${start}::date, ${end}::date))) AS piece
-        RETURNING 1
-      )
-      SELECT (SELECT count(*) FROM removed)::int AS count`,
+    z.object({ id: z.uuid() }),
+    q`UPDATE stays SET status = 'cancelled', cancelled_at = now(), cancelled_by = 'host'
+      WHERE kind = 'host_block' AND status = 'confirmed' AND listing_id = ${listingId} AND host_id = ${hostId}
+        AND nights && daterange(${start}::date, ${end}::date)
+      RETURNING id`,
     'unblockRange',
   )
-  return result[0]?.count ?? 0
+  if (removed.length === 0) return 0
+  await db.query(q`
+    INSERT INTO stays (kind, listing_id, host_id, nights, status, block_note)
+    SELECT 'host_block', s.listing_id, s.host_id, piece, 'confirmed', s.block_note
+    FROM stays s, unnest(datemultirange(s.nights) - datemultirange(daterange(${start}::date, ${end}::date))) AS piece
+    WHERE s.id = ANY(${removed.map((r) => r.id)}::uuid[])`)
+  return removed.length
 }
 
 const CalendarStay = z.object({
